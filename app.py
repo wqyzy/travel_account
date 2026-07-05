@@ -78,6 +78,19 @@ def init_db():
                 ('小丽', '摄影师', '#4a9c8c', '📸', 4),
             ]
         )
+    else:
+        # 已有数据时，迁移更新头像和角色
+        migrations = [
+            ('小明', '司机', '#3a5a8c', '🚗'),
+            ('小红', '财务', '#c67b5c', '💰'),
+            ('小刚', '吃货', '#d4a843', '🍴'),
+            ('小丽', '摄影师', '#4a9c8c', '📸'),
+        ]
+        for name, role, color, emoji in migrations:
+            c.execute(
+                "UPDATE members SET role=?, color=?, emoji=? WHERE name=?",
+                (role, color, emoji, name)
+            )
 
     c.execute("SELECT COUNT(*) FROM categories")
     if c.fetchone()[0] == 0:
