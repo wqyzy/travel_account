@@ -16,29 +16,23 @@
     <header class="header">
         <div class="header-inner">
             <div class="logo">
-                <span class="logo-icon">🏝️</span>
-                <h1>旅行记账本</h1>
+                <span class="logo-icon">🏔️</span>
+                <h1>新疆旅行记账</h1>
             </div>
             <div class="header-actions">
-                <button class="btn btn-sm btn-outline" onclick="openMemberModal()" title="管理成员">
-                    👥 成员
-                </button>
+                <button class="btn btn-sm btn-outline" onclick="openMemberModal()">👥 成员</button>
             </div>
         </div>
     </header>
 
     <main class="container">
         <!-- 概览卡片 -->
-        <section class="stats-grid" id="statsGrid">
-            <!-- 动态渲染 -->
-        </section>
+        <section class="stats-grid" id="statsGrid"></section>
 
         <!-- 分类汇总 -->
         <section class="section">
             <h2 class="section-title">📊 分类汇总</h2>
-            <div class="category-summary" id="categorySummary">
-                <!-- 动态渲染 -->
-            </div>
+            <div class="category-summary" id="categorySummary"></div>
         </section>
 
         <!-- 添加支出 -->
@@ -48,45 +42,31 @@
                 <div class="form-row">
                     <div class="form-group">
                         <label>付款人</label>
-                        <select name="member_id" id="memberSelect" required>
-                            <!-- 动态渲染 -->
-                        </select>
+                        <select name="member_id" id="memberSelect" required></select>
                     </div>
                     <div class="form-group">
                         <label>分类</label>
-                        <select name="category_id" id="categorySelect" required>
-                            <!-- 动态渲染 -->
-                        </select>
+                        <select name="category_id" id="categorySelect" required></select>
                     </div>
                     <div class="form-group">
                         <label>金额 ¥</label>
-                        <input type="number" name="amount" step="0.01" min="0.01"
-                               placeholder="0.00" required id="amountInput">
+                        <input type="number" name="amount" step="0.01" min="0.01" placeholder="0.00" required id="amountInput">
                     </div>
                 </div>
                 <div class="form-row">
                     <div class="form-group flex-2">
                         <label>备注（选填）</label>
-                        <input type="text" name="description" placeholder="例如：海底捞火锅">
+                        <input type="text" name="description" placeholder="例如：大盘鸡">
                     </div>
                     <div class="form-group">
-                        <label>截图凭证</label>
-                        <label class="file-upload-btn" for="receiptInput">
-                            📎 选择图片
-                        </label>
-                        <input type="file" name="receipt" id="receiptInput"
-                               accept="image/*" style="display:none"
-                               onchange="previewReceipt(this)">
+                        <label>截图凭证（可多选）</label>
+                        <label class="file-upload-btn" for="receiptInput">📎 选择图片</label>
+                        <input type="file" name="receipts" id="receiptInput" accept="image/*" multiple style="display:none" onchange="previewReceipts(this)">
                         <span class="file-name" id="fileName"></span>
                     </div>
                 </div>
-                <div class="receipt-preview" id="receiptPreview" style="display:none">
-                    <img id="receiptImg" src="" alt="凭证预览">
-                    <button type="button" class="preview-remove" onclick="clearReceipt()">✕</button>
-                </div>
-                <button type="submit" class="btn btn-primary btn-lg" id="submitBtn">
-                    💰 记录支出
-                </button>
+                <div class="receipt-previews" id="receiptPreviews"></div>
+                <button type="submit" class="btn btn-primary btn-lg" id="submitBtn">💰 记录支出</button>
             </form>
         </section>
 
@@ -96,7 +76,6 @@
                 <h2 class="section-title">📋 支出明细</h2>
                 <div class="filter-tabs" id="filterTabs">
                     <button class="filter-tab active" data-filter="all">全部</button>
-                    <!-- 分类筛选动态渲染 -->
                 </div>
             </div>
             <div class="expense-list" id="expenseList">
@@ -108,6 +87,53 @@
         </section>
     </main>
 
+    <!-- 编辑弹窗 -->
+    <div class="modal-overlay" id="editModal">
+        <div class="modal">
+            <div class="modal-header">
+                <h3>✏️ 编辑记录</h3>
+                <button class="modal-close" onclick="closeEditModal()">✕</button>
+            </div>
+            <div class="modal-body">
+                <form id="editForm" enctype="multipart/form-data">
+                    <input type="hidden" name="expense_id" id="editExpenseId">
+                    <div class="form-group" style="margin-bottom:10px">
+                        <label>付款人</label>
+                        <select name="member_id" id="editMemberSelect" required></select>
+                    </div>
+                    <div class="form-group" style="margin-bottom:10px">
+                        <label>分类</label>
+                        <select name="category_id" id="editCategorySelect" required></select>
+                    </div>
+                    <div class="form-group" style="margin-bottom:10px">
+                        <label>金额 ¥</label>
+                        <input type="number" name="amount" step="0.01" min="0.01" required id="editAmountInput">
+                    </div>
+                    <div class="form-group" style="margin-bottom:10px">
+                        <label>备注</label>
+                        <input type="text" name="description" id="editDescription">
+                    </div>
+                    <!-- 已有图片 -->
+                    <div class="form-group" style="margin-bottom:10px">
+                        <label>已有凭证</label>
+                        <div class="existing-receipts" id="existingReceipts"></div>
+                    </div>
+                    <!-- 新增图片 -->
+                    <div class="form-group" style="margin-bottom:10px">
+                        <label>新增凭证</label>
+                        <label class="file-upload-btn" for="editReceiptInput">📎 选择图片</label>
+                        <input type="file" name="receipts" id="editReceiptInput" accept="image/*" multiple style="display:none" onchange="previewEditReceipts(this)">
+                    </div>
+                    <div class="receipt-previews" id="editReceiptPreviews"></div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-outline" onclick="closeEditModal()">取消</button>
+                <button class="btn btn-primary" onclick="submitEdit()">💾 保存修改</button>
+            </div>
+        </div>
+    </div>
+
     <!-- 成员管理弹窗 -->
     <div class="modal-overlay" id="memberModal">
         <div class="modal">
@@ -115,9 +141,7 @@
                 <h3>👥 成员管理</h3>
                 <button class="modal-close" onclick="closeMemberModal()">✕</button>
             </div>
-            <div class="modal-body" id="memberList">
-                <!-- 动态渲染 -->
-            </div>
+            <div class="modal-body" id="memberList"></div>
             <div class="modal-footer">
                 <button class="btn btn-outline" onclick="closeMemberModal()">完成</button>
             </div>

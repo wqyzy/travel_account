@@ -14,7 +14,7 @@ BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 UPLOAD_FOLDER = os.path.join(BASE_DIR, 'uploads')
 DB_PATH = os.path.join(BASE_DIR, 'data.db')
 ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif', 'webp', 'bmp'}
-MAX_CONTENT_LENGTH = 16 * 1024 * 1024  # 16MB
+MAX_CONTENT_LENGTH = 32 * 1024 * 1024  # 32MB
 
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 app.config['MAX_CONTENT_LENGTH'] = MAX_CONTENT_LENGTH
@@ -23,7 +23,6 @@ os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
 
 def get_db():
-    """获取数据库连接"""
     conn = sqlite3.connect(DB_PATH)
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA journal_mode=WAL")
@@ -32,7 +31,6 @@ def get_db():
 
 
 def init_db():
-    """初始化数据库表"""
     conn = get_db()
     conn.executescript('''
         CREATE TABLE IF NOT EXISTS members (
@@ -58,14 +56,20 @@ def init_db():
             category_id INTEGER NOT NULL,
             amount REAL NOT NULL CHECK(amount > 0),
             description TEXT DEFAULT '',
-            receipt_path TEXT DEFAULT '',
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             FOREIGN KEY (member_id) REFERENCES members(id) ON DELETE CASCADE,
             FOREIGN KEY (category_id) REFERENCES categories(id) ON DELETE CASCADE
         );
+
+        CREATE TABLE IF NOT EXISTS receipts (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            expense_id INTEGER NOT NULL,
+            filename TEXT NOT NULL,
+            FOREIGN KEY (expense_id) REFERENCES expenses(id) ON DELETE CASCADE
+        );
     ''')
 
-    # 插入默认数据（如果表为空）
     c = conn.cursor()
     c.execute("SELECT COUNT(*) FROM members")
     if c.fetchone()[0] == 0:
@@ -79,7 +83,6 @@ def init_db():
             ]
         )
     else:
-        # 已有数据时，按 ID 强制更新头像和角色
         migrations = [
             (1, '🚗', '#3a5a8c', '司机'),
             (2, '💰', '#c67b5c', '财务'),
@@ -106,12 +109,66 @@ def init_db():
             ]
         )
 
+    # 迁移：移除旧 receipt_path 列（如果存在），迁移到 receipts 表
+    try:
+        old_receipts = conn.execute(
+            "SELECT id, receipt_path FROM expenses WHERE receipt_path != ''"
+        ).fetchall()
+        for row in old_receipts:
+            c.execute(
+                "INSERT OR IGNORE INTO receipts (expense_id, filename) VALUES (?,?)",
+                (row['id'], row['receipt_path'])
+            )
+        # 尝试删除旧列（SQLite 不支持 DROP COLUMN 在旧版本，忽略错误）
+        try:
+            conn.execute("ALTER TABLE expenses DROP COLUMN receipt_path")
+        except:
+            pass
+    except:
+        pass
+
     conn.commit()
     conn.close()
 
 
 def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
+
+
+def save_uploaded_files(expense_id):
+    """保存多图上传，返回文件名列表"""
+    saved = []
+    files = request.files.getlist('receipts')
+    for file in files:
+        if file and file.filename and allowed_file(file.filename):
+            ext = file.filename.rsplit('.', 1)[1].lower()
+            filename = f"{uuid.uuid4().hex}.{ext}"
+            file.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
+            saved.append(filename)
+    return saved
+
+
+def get_receipts(expense_id, conn):
+    rows = conn.execute(
+        "SELECT id, filename FROM receipts WHERE expense_id=? ORDER BY id", (expense_id,)
+    ).fetchall()
+    return [{'id': r['id'], 'filename': r['filename']} for r in rows]
+
+
+def get_expense_with_joins(conn, expense_id):
+    row = conn.execute('''
+        SELECT e.*, m.name as member_name, m.color as member_color, m.emoji as member_emoji,
+               c.name as category_name, c.icon as category_icon, c.color as category_color
+        FROM expenses e
+        JOIN members m ON e.member_id = m.id
+        JOIN categories c ON e.category_id = c.id
+        WHERE e.id = ?
+    ''', (expense_id,)).fetchone()
+    if row:
+        result = dict(row)
+        result['receipts'] = get_receipts(expense_id, conn)
+        return result
+    return None
 
 
 # ==================== 页面路由 ====================
@@ -126,9 +183,7 @@ def index():
 @app.route('/api/members', methods=['GET'])
 def get_members():
     conn = get_db()
-    rows = conn.execute(
-        "SELECT * FROM members ORDER BY sort_order"
-    ).fetchall()
+    rows = conn.execute("SELECT * FROM members ORDER BY sort_order").fetchall()
     conn.close()
     return jsonify([dict(r) for r in rows])
 
@@ -177,9 +232,7 @@ def delete_member(member_id):
 @app.route('/api/categories', methods=['GET'])
 def get_categories():
     conn = get_db()
-    rows = conn.execute(
-        "SELECT * FROM categories ORDER BY sort_order"
-    ).fetchall()
+    rows = conn.execute("SELECT * FROM categories ORDER BY sort_order").fetchall()
     conn.close()
     return jsonify([dict(r) for r in rows])
 
@@ -197,56 +250,87 @@ def get_expenses():
         JOIN categories c ON e.category_id = c.id
         ORDER BY e.created_at DESC
     ''').fetchall()
+    result = []
+    for r in rows:
+        d = dict(r)
+        d['receipts'] = get_receipts(r['id'], conn)
+        result.append(d)
     conn.close()
-    return jsonify([dict(r) for r in rows])
+    return jsonify(result)
 
 
 @app.route('/api/expenses', methods=['POST'])
 def add_expense():
     data = request.form
-    receipt_path = ''
-
-    # 处理截图上传
-    if 'receipt' in request.files:
-        file = request.files['receipt']
-        if file and file.filename and allowed_file(file.filename):
-            ext = file.filename.rsplit('.', 1)[1].lower()
-            filename = f"{uuid.uuid4().hex}.{ext}"
-            file.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
-            receipt_path = filename
-
     conn = get_db()
     c = conn.cursor()
     c.execute(
-        "INSERT INTO expenses (member_id, category_id, amount, description, receipt_path) VALUES (?,?,?,?,?)",
+        "INSERT INTO expenses (member_id, category_id, amount, description) VALUES (?,?,?,?)",
         (int(data['member_id']), int(data['category_id']),
-         float(data['amount']), data.get('description', ''), receipt_path)
+         float(data['amount']), data.get('description', ''))
     )
-    conn.commit()
     expense_id = c.lastrowid
 
-    # 返回新创建的记录
-    row = conn.execute('''
-        SELECT e.*, m.name as member_name, m.color as member_color, m.emoji as member_emoji,
-               c.name as category_name, c.icon as category_icon, c.color as category_color
-        FROM expenses e
-        JOIN members m ON e.member_id = m.id
-        JOIN categories c ON e.category_id = c.id
-        WHERE e.id = ?
-    ''', (expense_id,)).fetchone()
+    # 保存多图
+    saved = save_uploaded_files(expense_id)
+    for filename in saved:
+        c.execute("INSERT INTO receipts (expense_id, filename) VALUES (?,?)",
+                  (expense_id, filename))
+
+    conn.commit()
+    result = get_expense_with_joins(conn, expense_id)
     conn.close()
-    return jsonify(dict(row))
+    return jsonify(result)
+
+
+@app.route('/api/expenses/<int:expense_id>', methods=['PUT'])
+def edit_expense(expense_id):
+    conn = get_db()
+    c = conn.cursor()
+
+    # 如果传了表单数据就更新字段
+    if request.form:
+        data = request.form
+        c.execute(
+            "UPDATE expenses SET member_id=?, category_id=?, amount=?, description=?, updated_at=CURRENT_TIMESTAMP WHERE id=?",
+            (int(data['member_id']), int(data['category_id']),
+             float(data['amount']), data.get('description', ''), expense_id)
+        )
+
+        # 处理删除指定图片
+        delete_ids = request.form.get('delete_receipts', '')
+        if delete_ids:
+            for rid in delete_ids.split(','):
+                rid = rid.strip()
+                if rid:
+                    row = conn.execute("SELECT filename FROM receipts WHERE id=?", (int(rid),)).fetchone()
+                    if row:
+                        filepath = os.path.join(app.config['UPLOAD_FOLDER'], row['filename'])
+                        if os.path.exists(filepath):
+                            os.remove(filepath)
+                    conn.execute("DELETE FROM receipts WHERE id=?", (int(rid),))
+
+        # 保存新增图片
+        saved = save_uploaded_files(expense_id)
+        for filename in saved:
+            c.execute("INSERT INTO receipts (expense_id, filename) VALUES (?,?)",
+                      (expense_id, filename))
+
+    conn.commit()
+    result = get_expense_with_joins(conn, expense_id)
+    conn.close()
+    return jsonify(result)
 
 
 @app.route('/api/expenses/<int:expense_id>', methods=['DELETE'])
 def delete_expense(expense_id):
     conn = get_db()
     # 删除关联的截图文件
-    row = conn.execute(
-        "SELECT receipt_path FROM expenses WHERE id=?", (expense_id,)
-    ).fetchone()
-    if row and row['receipt_path']:
-        filepath = os.path.join(app.config['UPLOAD_FOLDER'], row['receipt_path'])
+    receipts = conn.execute(
+        "SELECT filename FROM receipts WHERE expense_id=?", (expense_id,)
+    ).fetchall()
+    for r in receipts:
+        filepath = os.path.join(app.config['UPLOAD_FOLDER'], r['filename'])
         if os.path.exists(filepath):
             os.remove(filepath)
 
@@ -261,17 +345,10 @@ def delete_expense(expense_id):
 @app.route('/api/stats', methods=['GET'])
 def get_stats():
     conn = get_db()
-
-    # 总支出
     total = conn.execute("SELECT COALESCE(SUM(amount), 0) as total FROM expenses").fetchone()['total']
-
-    # 成员数量
     member_count = conn.execute("SELECT COUNT(*) as cnt FROM members").fetchone()['cnt']
-
-    # 人均应付
     per_person = round(total / member_count, 2) if member_count > 0 else 0
 
-    # 每人已付
     member_paid = conn.execute('''
         SELECT m.id, m.name, m.color, m.emoji,
                COALESCE(SUM(e.amount), 0) as paid
@@ -281,7 +358,6 @@ def get_stats():
         ORDER BY m.sort_order
     ''').fetchall()
 
-    # 每分类汇总
     category_summary = conn.execute('''
         SELECT c.id, c.name, c.icon, c.color,
                COALESCE(SUM(e.amount), 0) as total,
@@ -293,7 +369,6 @@ def get_stats():
     ''').fetchall()
 
     conn.close()
-
     return jsonify({
         'total': round(total, 2),
         'member_count': member_count,

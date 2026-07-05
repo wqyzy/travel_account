@@ -363,6 +363,13 @@ body {
     word-break: break-all;
 }
 
+.receipt-previews {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-bottom: 12px;
+}
+
 .receipt-preview {
     position: relative;
     width: 100px;
@@ -455,6 +462,19 @@ body {
 .btn-sm {
     padding: 7px 14px;
     font-size: 13px;
+}
+
+.btn-edit {
+    background: transparent;
+    color: var(--accent);
+    border: none;
+    padding: 8px 10px;
+    font-size: 15px;
+    border-radius: var(--radius-sm);
+}
+
+.btn-edit:active {
+    background: var(--accent-light);
 }
 
 .btn-danger {
@@ -593,6 +613,7 @@ body {
 }
 
 .expense-item .ei-receipt {
+    position: relative;
     width: 36px;
     height: 36px;
     border-radius: 8px;
@@ -617,6 +638,68 @@ body {
     justify-content: center;
     font-size: 14px;
     flex-shrink: 0;
+}
+
+.receipt-count {
+    position: absolute;
+    bottom: -4px;
+    right: -4px;
+    background: var(--primary);
+    color: #fff;
+    font-size: 10px;
+    font-weight: 700;
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: 2px solid var(--bg-card);
+}
+
+/* 编辑弹窗中的已有凭证 */
+.existing-receipts {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 4px;
+}
+
+.existing-receipt-item {
+    position: relative;
+    width: 72px;
+    height: 72px;
+    border-radius: 8px;
+    overflow: hidden;
+    border: 2px solid var(--border);
+    transition: opacity 0.2s;
+}
+
+.existing-receipt-item img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.existing-receipt-del {
+    position: absolute;
+    top: 2px;
+    right: 2px;
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    background: rgba(0,0,0,0.6);
+    color: #fff;
+    border: none;
+    font-size: 11px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+}
+
+.existing-receipt-del:active {
+    background: var(--danger);
 }
 
 .expense-item .ei-actions {
@@ -720,6 +803,35 @@ body {
     display: flex;
     justify-content: flex-end;
     gap: 8px;
+}
+
+/* 编辑弹窗表单 */
+#editForm select,
+#editForm input[type="text"],
+#editForm input[type="number"] {
+    padding: 11px 14px;
+    border: 2px solid var(--border);
+    border-radius: var(--radius-sm);
+    font-size: 16px;
+    font-family: inherit;
+    color: var(--text);
+    background: var(--bg-card);
+    outline: none;
+    width: 100%;
+    -webkit-appearance: none;
+}
+
+#editForm select {
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%238b7355' d='M6 8L1 3h10z'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 14px center;
+    padding-right: 36px;
+}
+
+#editForm select:focus,
+#editForm input:focus {
+    border-color: var(--primary);
+    box-shadow: 0 0 0 3px var(--primary-light);
 }
 
 /* 成员管理 */
@@ -917,6 +1029,10 @@ body {
 
     .btn-danger:hover {
         background: var(--danger-light);
+    }
+
+    .btn-edit:hover {
+        background: var(--accent-light);
     }
 
     .file-upload-btn:hover {
