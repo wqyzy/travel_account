@@ -166,10 +166,10 @@ function renderExpenseList() {
             <div class="ei-row-top">
                 <div class="ei-cat" style="background:${e.category_color}20; color:${e.category_color}">${e.category_icon}</div>
                 <div class="ei-info">
-                    <div class="ei-desc">${e.description || e.category_name}</div>
+                    <div class="ei-title">${e.category_icon} ${e.category_name}</div>
+                    ${e.description ? `<div class="ei-desc">${e.description}</div>` : ''}
                     <div class="ei-meta">
                         <span style="display:inline-flex;align-items:center;gap:3px"><span>${e.member_emoji}</span><span style="color:${e.member_color};font-weight:500">${e.member_name}</span></span>
-                        <span>${e.category_name}</span>
                         <span>${time}</span>
                     </div>
                 </div>
