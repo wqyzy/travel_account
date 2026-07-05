@@ -79,17 +79,17 @@ def init_db():
             ]
         )
     else:
-        # 已有数据时，迁移更新头像和角色
+        # 已有数据时，按 ID 强制更新头像和角色
         migrations = [
-            ('小明', '司机', '#3a5a8c', '🚗'),
-            ('小红', '财务', '#c67b5c', '💰'),
-            ('小刚', '吃货', '#d4a843', '🍴'),
-            ('小丽', '摄影师', '#4a9c8c', '📸'),
+            (1, '🚗', '#3a5a8c', '司机'),
+            (2, '💰', '#c67b5c', '财务'),
+            (3, '🍴', '#d4a843', '吃货'),
+            (4, '📸', '#4a9c8c', '摄影师'),
         ]
-        for name, role, color, emoji in migrations:
+        for mid, emoji, color, role in migrations:
             c.execute(
-                "UPDATE members SET role=?, color=?, emoji=? WHERE name=?",
-                (role, color, emoji, name)
+                "UPDATE members SET emoji=?, color=?, role=? WHERE id=?",
+                (emoji, color, role, mid)
             )
 
     c.execute("SELECT COUNT(*) FROM categories")
