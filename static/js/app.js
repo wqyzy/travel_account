@@ -94,19 +94,25 @@ function renderStats() {
 
     grid.innerHTML = `
         <div class="stat-card total">
-            <div class="stat-label">💰 总支出</div>
-            <div class="stat-value">¥${s.total.toFixed(2)}</div>
+            <div class="stat-row">
+                <div class="stat-label">💰 总支出</div>
+                <div class="stat-value">¥${s.total.toFixed(2)}</div>
+            </div>
         </div>
         <div class="stat-card per-person">
-            <div class="stat-label">👤 人均应付</div>
-            <div class="stat-value">¥${s.per_person.toFixed(2)}</div>
+            <div class="stat-row">
+                <div class="stat-label">👤 人均应付</div>
+                <div class="stat-value">¥${s.per_person.toFixed(2)}</div>
+            </div>
             <div class="stat-sub">${s.member_count} 人平摊</div>
         </div>
         <div class="stat-card count">
-            <div class="stat-label">📝 记录笔数</div>
-            <div class="stat-value">${s.member_paid.reduce((sum, m) => sum + (s.expense_count || 0), state.expenses.length)}</div>
+            <div class="stat-row">
+                <div class="stat-label">📝 记录笔数</div>
+                <div class="stat-value">${s.member_paid.reduce((sum, m) => sum + (s.expense_count || 0), state.expenses.length)}</div>
+            </div>
         </div>
-        <div class="stat-card" style="grid-column: 1 / -1;">
+        <div class="stat-card member-paid-card">
             <div class="stat-label">💳 每人已付 & 差额</div>
             <div class="member-paid-row">${memberTags}</div>
         </div>
