@@ -8,10 +8,4 @@ if path not in sys.path:
 
 os.chdir(path)
 
-from app import app, init_db
-
-# 初始化数据库
-init_db()
-
-# PythonAnywhere 需要的 WSGI application 对象
-application = app
+from app import app as application

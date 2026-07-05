@@ -4,15 +4,10 @@
 """
 import os
 import uuid
-from datetime import datetime
 from flask import Flask, render_template, request, jsonify, send_from_directory
-from flask_cors import CORS
-from werkzeug.utils import secure_filename
 import sqlite3
-import json
 
 app = Flask(__name__)
-CORS(app)
 
 # 配置
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
