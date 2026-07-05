@@ -288,27 +288,29 @@ def edit_expense(expense_id):
     conn = get_db()
     c = conn.cursor()
 
-    # 如果传了表单数据就更新字段
-    if request.form:
+    try:
         data = request.form
         c.execute(
             "UPDATE expenses SET member_id=?, category_id=?, amount=?, description=?, updated_at=CURRENT_TIMESTAMP WHERE id=?",
-            (int(data['member_id']), int(data['category_id']),
-             float(data['amount']), data.get('description', ''), expense_id)
+            (int(data.get('member_id', 0)), int(data.get('category_id', 0)),
+             float(data.get('amount', 0)), data.get('description', ''), expense_id)
         )
 
         # 处理删除指定图片
-        delete_ids = request.form.get('delete_receipts', '')
+        delete_ids = data.get('delete_receipts', '')
         if delete_ids:
             for rid in delete_ids.split(','):
                 rid = rid.strip()
                 if rid:
-                    row = conn.execute("SELECT filename FROM receipts WHERE id=?", (int(rid),)).fetchone()
+                    row = conn.execute(
+                        "SELECT filename FROM receipts WHERE id=? AND expense_id=?",
+                        (int(rid), expense_id)
+                    ).fetchone()
                     if row:
                         filepath = os.path.join(app.config['UPLOAD_FOLDER'], row['filename'])
                         if os.path.exists(filepath):
                             os.remove(filepath)
-                    conn.execute("DELETE FROM receipts WHERE id=?", (int(rid),))
+                    conn.execute("DELETE FROM receipts WHERE id=? AND expense_id=?", (int(rid), expense_id))
 
         # 保存新增图片
         saved = save_uploaded_files(expense_id)
@@ -316,10 +318,13 @@ def edit_expense(expense_id):
             c.execute("INSERT INTO receipts (expense_id, filename) VALUES (?,?)",
                       (expense_id, filename))
 
-    conn.commit()
-    result = get_expense_with_joins(conn, expense_id)
-    conn.close()
-    return jsonify(result)
+        conn.commit()
+        result = get_expense_with_joins(conn, expense_id)
+        conn.close()
+        return jsonify(result)
+    except Exception as e:
+        conn.close()
+        return jsonify({'error': str(e)}), 500
 
 
 @app.route('/api/expenses/<int:expense_id>', methods=['DELETE'])
