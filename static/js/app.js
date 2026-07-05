@@ -163,21 +163,25 @@ function renderExpenseList() {
             : `<div class="ei-receipt-placeholder">📎</div>`;
 
         return `<div class="expense-item" data-id="${e.id}">
-            <div class="ei-cat" style="background:${e.category_color}20; color:${e.category_color}">${e.category_icon}</div>
-            <div class="ei-info">
-                <div class="ei-desc">${e.description || e.category_name}</div>
-                <div class="ei-meta">
-                    <span style="display:inline-flex;align-items:center;gap:3px"><span>${e.member_emoji}</span><span style="color:${e.member_color};font-weight:500">${e.member_name}</span></span>
-                    <span>${e.category_name}</span>
-                    <span>${time}</span>
+            <div class="ei-row-top">
+                <div class="ei-cat" style="background:${e.category_color}20; color:${e.category_color}">${e.category_icon}</div>
+                <div class="ei-info">
+                    <div class="ei-desc">${e.description || e.category_name}</div>
+                    <div class="ei-meta">
+                        <span style="display:inline-flex;align-items:center;gap:3px"><span>${e.member_emoji}</span><span style="color:${e.member_color};font-weight:500">${e.member_name}</span></span>
+                        <span>${e.category_name}</span>
+                        <span>${time}</span>
+                    </div>
                 </div>
+                <div class="ei-amount">¥${e.amount.toFixed(2)}</div>
             </div>
-            <div class="ei-amount">¥${e.amount.toFixed(2)}</div>
-            <div class="ei-per-person">人均<br><span>¥${(e.amount / memberCount).toFixed(2)}</span></div>
-            ${receiptHtml}
-            <div class="ei-actions">
-                <button class="btn btn-edit" onclick="openEditModal(${e.id})" title="编辑">✏️</button>
-                <button class="btn btn-danger" onclick="deleteExpense(${e.id})" title="删除">🗑️</button>
+            <div class="ei-row-bottom">
+                <div class="ei-per-person">人均 <span>¥${(e.amount / memberCount).toFixed(2)}</span></div>
+                ${receiptHtml}
+                <div class="ei-actions">
+                    <button class="btn btn-edit" onclick="openEditModal(${e.id})" title="编辑">✏️</button>
+                    <button class="btn btn-danger" onclick="deleteExpense(${e.id})" title="删除">🗑️</button>
+                </div>
             </div>
         </div>`;
     }).join('');
