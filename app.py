@@ -109,7 +109,36 @@ def init_db():
             ]
         )
 
-    # 迁移：移除旧 receipt_path 列（如果存在），迁移到 receipts 表
+    # 迁移：添加 updated_at 列（如果缺失）
+    columns = [col['name'] for col in conn.execute("PRAGMA table_info(expenses)").fetchall()]
+    if 'updated_at' not in columns:
+        conn.execute("ALTER TABLE expenses ADD COLUMN updated_at TIMESTAMP")
+
+    # 迁移：确保 receipts 表存在（旧数据没有这个表）
+    tables = [row['name'] for row in conn.execute("SELECT name FROM sqlite_master WHERE type='table'").fetchall()]
+    if 'receipts' not in tables:
+        conn.execute('''
+            CREATE TABLE IF NOT EXISTS receipts (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                expense_id INTEGER NOT NULL,
+                filename TEXT NOT NULL,
+                FOREIGN KEY (expense_id) REFERENCES expenses(id) ON DELETE CASCADE
+            )
+        ''')
+        # 迁移旧数据
+        try:
+            old_receipts = conn.execute(
+                "SELECT id, receipt_path FROM expenses WHERE receipt_path != '' AND receipt_path IS NOT NULL"
+            ).fetchall()
+            for row in old_receipts:
+                c.execute(
+                    "INSERT OR IGNORE INTO receipts (expense_id, filename) VALUES (?,?)",
+                    (row['id'], row['receipt_path'])
+                )
+        except:
+            pass
+
+    # 迁移：移除旧 receipt_path 列，迁移到 receipts 表
     try:
         old_receipts = conn.execute(
             "SELECT id, receipt_path FROM expenses WHERE receipt_path != ''"
