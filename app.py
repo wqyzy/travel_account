@@ -25,13 +25,22 @@ os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 def get_db():
     conn = sqlite3.connect(DB_PATH)
     conn.row_factory = sqlite3.Row
-    conn.execute("PRAGMA journal_mode=WAL")
     conn.execute("PRAGMA foreign_keys=ON")
     return conn
 
 
 def init_db():
     conn = get_db()
+
+    # 快速检查是否已完成迁移（避免每次启动跑全套）
+    try:
+        v = conn.execute("SELECT version FROM _db_version").fetchone()
+        if v and v['version'] >= 2:
+            conn.close()
+            return
+    except:
+        pass
+
     conn.executescript('''
         CREATE TABLE IF NOT EXISTS members (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -156,6 +165,12 @@ def init_db():
     except:
         pass
 
+    # 记录迁移版本
+    conn.execute("CREATE TABLE IF NOT EXISTS _db_version (version INTEGER)")
+    c = conn.cursor()
+    c.execute("DELETE FROM _db_version")
+    c.execute("INSERT INTO _db_version (version) VALUES (2)")
+
     conn.commit()
     conn.close()
 
@@ -279,10 +294,26 @@ def get_expenses():
         JOIN categories c ON e.category_id = c.id
         ORDER BY e.created_at DESC
     ''').fetchall()
+
+    # 批量加载所有凭证（避免 N+1 查询）
+    expense_ids = [r['id'] for r in rows]
+    receipts_map = {}
+    if expense_ids:
+        placeholders = ','.join('?' * len(expense_ids))
+        receipt_rows = conn.execute(
+            f"SELECT id, expense_id, filename FROM receipts WHERE expense_id IN ({placeholders}) ORDER BY id",
+            expense_ids
+        ).fetchall()
+        for r in receipt_rows:
+            eid = r['expense_id']
+            if eid not in receipts_map:
+                receipts_map[eid] = []
+            receipts_map[eid].append({'id': r['id'], 'filename': r['filename']})
+
     result = []
     for r in rows:
         d = dict(r)
-        d['receipts'] = get_receipts(r['id'], conn)
+        d['receipts'] = receipts_map.get(r['id'], [])
         result.append(d)
     conn.close()
     return jsonify(result)
